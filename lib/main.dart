@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:search/screens/home_page.dart';
+import 'package:search/screens/bubble/bubble.dart';
 
 void main() {
   runApp(const MyApp());
