@@ -1,121 +1,275 @@
-import 'package:dio/dio.dart';
+import 'dart:math';
+
+import 'package:flutter_colorpicker/flutter_colorpicker.dart';
+import 'package:vector_math/vector_math.dart' show radians;
 import 'package:flutter/material.dart';
 
-class HomeScreen extends StatefulWidget {
-  const HomeScreen({Key? key}) : super(key: key);
+Color color = Colors.blue;
+late AnimationController controller;
+int bubbles = 5;
+late AnimationController rotationController;
+bool rotate = false;
+bool randomColor = false;
+bool animate = false;
+List<Color> colors = [
+  Colors.green,
+  Colors.purple,
+  Colors.cyan,
+  Colors.blue,
+  Colors.orange,
+  Colors.red,
+];
+
+class BubbleAnimation extends StatefulWidget {
+  const BubbleAnimation({Key? key}) : super(key: key);
 
   @override
-  _HomeScreenState createState() => _HomeScreenState();
+  State<BubbleAnimation> createState() => _BubbleAnimationState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
-  _HomeScreenState() {
-    _filter.addListener(() {
-      if (_filter.text.isEmpty) {
-        setState(() {
-          _searchText = "";
-          filteredNames = names;
-        });
-      } else {
-        setState(() {
-          _searchText = _filter.text;
-        });
-      }
-    });
-  }
-
-  final TextEditingController _filter = TextEditingController();
-  final dio = Dio();
-  String _searchText = "";
-  List names = [];
-  List filteredNames = [];
-  Icon _searchIcon = const Icon(Icons.search);
-  Widget _appBarTitle = const Text('Search Example');
-
-  //step 2.1
-  void _getNames() async {
-    final response =
-        await dio.get('https://jsonplaceholder.typicode.com/users');
-    print(response.data);
-    List tempList = [];
-    for (int i = 0; i < response.data.length; i++) {
-      tempList.add(response.data[i]);
-    }
-    setState(() {
-      names = tempList;
-      filteredNames = names;
-    });
-  }
-
-//Step 2.2
-  void _searchPressed() {
-    setState(() {
-      if (_searchIcon.icon == Icons.search) {
-        _searchIcon = const Icon(Icons.close);
-        _appBarTitle = TextField(
-          controller: _filter,
-          decoration: const InputDecoration(
-              prefixIcon: Icon(Icons.search), hintText: 'Search...'),
-        );
-      } else {
-        _searchIcon = const Icon(Icons.search);
-        _appBarTitle = const Text('Search Example');
-        filteredNames = names;
-        _filter.clear();
-      }
-    });
-  }
-
-  //Step 4
-  Widget _buildList() {
-    if (_searchText.isNotEmpty) {
-      List tempList = [];
-      for (int i = 0; i < filteredNames.length; i++) {
-        if (filteredNames[i]['name']
-            .toLowerCase()
-            .contains(_searchText.toLowerCase())) {
-          tempList.add(filteredNames[i]);
-        }
-      }
-      filteredNames = tempList;
-    }
-    return ListView.builder(
-      itemCount: filteredNames.length,
-      itemBuilder: (BuildContext context, int index) {
-        return ListTile(
-          title: Text(filteredNames[index]['name']),
-          onTap: () => print(filteredNames[index]['name']),
-        );
-      },
-    );
-  }
-
-  //STep6
-  _buildBar(BuildContext context) {
-    return AppBar(
-      centerTitle: true,
-      title: _appBarTitle,
-      leading: IconButton(
-        icon: _searchIcon,
-        onPressed: _searchPressed,
-      ),
-    );
-  }
-
+class _BubbleAnimationState extends State<BubbleAnimation>
+    with TickerProviderStateMixin {
   @override
   void initState() {
-    _getNames();
     super.initState();
+    controller =
+        AnimationController(duration: const Duration(seconds: 1), vsync: this);
+    rotationController =
+        AnimationController(duration: const Duration(seconds: 6), vsync: this);
+    controller.repeat(reverse: true);
+    rotationController.repeat(reverse: false);
   }
 
   @override
   Widget build(BuildContext context) {
+    final size = MediaQuery.of(context).size;
     return Scaffold(
-      appBar: _buildBar(context),
-      body: Container(
-        child: _buildList(),
+      appBar: PreferredSize(
+        preferredSize: size * 0.2,
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              const Text('Item counts'),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  IconButton(
+                    onPressed: () {
+                      if (bubbles > 0) {
+                        setState(() {
+                          bubbles--;
+                        });
+                      }
+                    },
+                    icon: const Icon(Icons.minimize),
+                  ),
+                  Text('$bubbles'),
+                  IconButton(
+                    onPressed: () {
+                      setState(
+                        () {
+                          bubbles++;
+                        },
+                      );
+                    },
+                    icon: const Icon(Icons.add),
+                  ),
+                ],
+              ),
+              chooseColorButton(context, size)
+            ],
+          ),
+        ),
       ),
-//
+      persistentFooterButtons: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: [
+            switchTitle('Animate', animate, () {
+              animate = !animate;
+            }),
+            switchTitle('Rotate', rotate, () {
+              rotate = !rotate;
+            }),
+            switchTitle('Dynamic colors', randomColor, () {
+              randomColor = !randomColor;
+            }),
+            // chooseColorButton(context, size),
+          ],
+        ),
+      ],
+      body: SizedBox(
+        height: size.height * 0.5,
+        width: size.width,
+        child: Stack(
+          children: List.generate(
+            bubbles,
+            (index) {
+              var list = [];
+              list.addAll(List<int>.generate(
+                  bubbles,
+                  (index) => bubbles == 2
+                      ? index == 0
+                          ? 2
+                          : (index) * 4
+                      : index));
+              var rad = bubbles == 2 ? list[index] * 4 : list[index].toDouble();
+
+              return RadialAnimation(
+                radius: rad > 4 ? rad * 2 : rad * 4,
+                itemColor: randomColor ? colors[index % 6] : color,
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
+  ElevatedButton chooseColorButton(BuildContext context, Size size) {
+    return ElevatedButton(
+      onPressed: () async {
+        showDialog(
+          context: context,
+          builder: (_) => AlertDialog(
+            content: SizedBox(
+              height: size.height * 0.55,
+              width: size.width,
+              child: ColorPicker(
+                onColorChanged: (col) {
+                  setState(() {
+                    color = col;
+                  });
+                },
+                pickerColor: color,
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                },
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                },
+                child: const Text('Done'),
+              ),
+            ],
+          ),
+        );
+      },
+      child: const Text('Choose color'),
+    );
+  }
+
+  Widget switchTitle(String title, bool value, Function onchanged) {
+    return Column(
+      children: [
+        Text(
+          title,
+          style: const TextStyle(
+            fontSize: 18.0,
+          ),
+        ),
+        Switch(
+          value: value,
+          onChanged: (val) {
+            setState(() {
+              onchanged();
+            });
+          },
+        ),
+      ],
+    );
+  }
+
+  @override
+  void dispose() {
+    controller.dispose();
+    super.dispose();
+  }
+}
+
+class RadialAnimation extends StatelessWidget {
+  final Animation<double> translation;
+  final Animation<double> sTranslation;
+  final items = 16;
+  final num radius;
+  final Color itemColor;
+
+  RadialAnimation({
+    Key? key,
+    required this.radius,
+    required this.itemColor,
+  })  : translation = Tween<double>(
+          begin: !animate ? radius * 8 : radius * 6,
+          end: !animate ? radius * 8 : radius * 11,
+        ).animate(
+          CurvedAnimation(parent: controller, curve: Curves.linear),
+        ),
+        sTranslation = Tween<double>(
+          end: !animate ? radius * 6 : radius * 6,
+          begin: !animate ? radius * 6 : radius * 11,
+        ).animate(
+          CurvedAnimation(parent: controller, curve: Curves.linear),
+        ),
+        super(key: key);
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: AnimatedBuilder(
+        animation: controller,
+        builder: (context, widget) {
+          return RotationTransition(
+            turns: Tween(
+              begin: rotate ? 0.0 : 1.0,
+              end: 1.0,
+            ).animate(rotationController),
+            child: Stack(
+              alignment: Alignment.center,
+              children: List.generate(
+                items,
+                (index) => (360 / items) + (index * (360 / items)),
+              ).map((e) {
+                final double rad = radians(e.toDouble());
+                return Transform(
+                  transform: !animate
+                      ? (Matrix4.identity()
+                        ..translate(
+                          (sTranslation.value) * sin(rad),
+                          (sTranslation.value) * cos(rad),
+                        ))
+                      : e % 45 == 0
+                          ? (Matrix4.identity()
+                            ..translate(
+                              (sTranslation.value) * sin(rad),
+                              (sTranslation.value) * cos(rad),
+                            ))
+                          : (Matrix4.identity()
+                            ..translate(
+                              (translation.value) * cos(rad),
+                              (translation.value) * sin(rad),
+                            )),
+                  child: CircleAvatar(
+                    radius: bubbles == 1
+                        ? 8
+                        : radius <= 0
+                            ? 2
+                            : double.parse(radius.toString()),
+                    backgroundColor: itemColor,
+                  ),
+                );
+              }).toList(),
+            ),
+          );
+        },
+      ),
     );
   }
 }
